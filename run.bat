@@ -1,3 +1,3 @@
 @echo off
-py -3 "%~dp0src\main.py" %*
+python "%~dp0src\main.py" %*
 exit /b %errorlevel%
