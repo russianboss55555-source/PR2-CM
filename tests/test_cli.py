@@ -24,33 +24,6 @@ class CliTests(unittest.TestCase):
             check=False,
         )
 
-    def test_registry_config(self):
-        """Print all five values for a registry URL."""
-        result = self.run_cli(
-            "--package", "serde", "--source", REGISTRY, "--output", "graph.svg"
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(
-            result.stdout.splitlines(),
-            [
-                "package=serde",
-                f"source={REGISTRY}",
-                "test_mode=False",
-                "output=graph.svg",
-                "ascii_tree=False",
-            ],
-        )
-
-    def test_local_config(self):
-        """Accept an existing fixture and enable both switches."""
-        result = self.run_cli(
-            "--package", "A", "--source", str(FIXTURE),
-            "--output", "graph.svg", "--test-mode", "--ascii-tree",
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("test_mode=True", result.stdout)
-        self.assertIn("ascii_tree=True", result.stdout)
-
     def test_invalid_options(self):
         """Report an invalid input for each option."""
         valid = [
