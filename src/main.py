@@ -1,13 +1,15 @@
-"""Build and inspect a transitive Cargo dependency graph."""
+"""Run the Cargo dependency visualizer from the command line."""
 
 import sys
 from argparse import Namespace
+from pathlib import Path
 
 from cargo_graph import CargoGraph
 from cli import parse_config
 from graph import Graph, recursive_bfs, reverse_graph
 from local_index import read_test_index
 from registry import CargoIndex
+from visualization import make_ascii, save_graph
 
 
 def build_graph(config: Namespace) -> tuple[str, Graph]:
@@ -26,19 +28,23 @@ def build_graph(config: Namespace) -> tuple[str, Graph]:
 
 
 def main() -> int:
-    """Print the graph in BFS order, including original cycle edges."""
+    """Save the graph and print only the requested console output."""
     config = parse_config()
+    output = Path(config.output)
     try:
         root, graph = build_graph(config)
+        if config.reverse:
+            dependents = [package for package in graph if package != root]
+            print(f"{root} <- {', '.join(dependents) or '(none)'}")
+            return 0
+        dot_path = save_graph(output, root, graph)
     except (KeyError, OSError, RecursionError, TypeError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    if config.reverse:
-        dependents = [package for package in graph if package != root]
-        print(f"{root} <- {', '.join(dependents) or '(none)'}")
-        return 0
-    for package, dependencies in graph.items():
-        print(f"{package}: {', '.join(dependencies) or '(none)'}")
+    if config.ascii_tree:
+        print(make_ascii(root, graph))
+    print(f"SVG: {output}")
+    print(f"DOT: {dot_path}")
     return 0
 
 

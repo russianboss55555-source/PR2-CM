@@ -1,0 +1,17 @@
+name: Verify PR2
+on: [push]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install Graphviz
+        run: |
+          command -v dot || (sudo apt-get update && sudo apt-get install -y graphviz)
+      - name: Test the CLI
+        run: python3 -m unittest discover -s tests -v
+      - name: Compare real packages with Cargo
+        run: python3 demo/compare_cargo.py

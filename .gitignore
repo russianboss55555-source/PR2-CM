@@ -7,3 +7,8 @@ __pycache__/
 build/
 dist/
 *.zip
+out/
+*.dot
+*.svg
+Cargo.lock
+target/

@@ -1,6 +1,7 @@
 """Exercise direct Cargo index reading and failure handling over HTTP."""
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -69,16 +70,18 @@ class RegistryTests(unittest.TestCase):
         )
         self.write_index("3/x/xyz", dict(name="xyz", vers="1.0.0", deps=[]))
 
+    @unittest.skipUnless(shutil.which("dot"), "requires Graphviz")
     def test_registry_graph(self):
         """Resolve a version range and follow an optional default feature."""
         self.populate_demo()
-        result = self.run_cli("Demo")
+        result = self.run_cli("Demo", "--ascii-tree")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.splitlines(), [
-            "demo v1.10.0: ab v1.10.0, xyz v1.0.0",
-            "ab v1.10.0: (none)",
-            "xyz v1.0.0: (none)",
+        self.assertEqual(result.stdout.splitlines()[:3], [
+            "demo v1.10.0", "+-- ab v1.10.0", "`-- xyz v1.0.0",
         ])
+        dot = (self.folder / "graph.dot").read_text(encoding="utf-8")
+        self.assertIn('"demo v1.10.0" -> "ab v1.10.0";', dot)
+        self.assertIn('"demo v1.10.0" -> "xyz v1.0.0";', dot)
 
     def test_missing_crate(self):
         """A missing sparse-index file yields a diagnosis and exit code 1."""

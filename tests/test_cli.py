@@ -1,87 +1,96 @@
-"""Check stage-one configuration and errors through the CLI."""
+"""Check the final CLI in normal, test, and reverse modes."""
 
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = ROOT / "src" / "main.py"
-FIXTURE = ROOT / "tests" / "fixtures" / "simple.json"
+FIXTURES = ROOT / "tests" / "fixtures"
 REGISTRY = "https://index.crates.io"
 
 
 class CliTests(unittest.TestCase):
-    """Exercise the five command-line settings in both source modes."""
+    """Exercise error handling and local graphs through the CLI."""
 
-    def run_cli(self, *args: str) -> subprocess.CompletedProcess:
-        """Run the prototype with the current Python interpreter."""
+    def setUp(self):
+        """Use an isolated output directory for each run."""
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.svg = Path(directory.name) / "nested" / "graph.svg"
+
+    def run_cli(self, *args):
+        """Run the program with the active Python interpreter."""
         return subprocess.run(
-            [sys.executable, str(MAIN), *args],
-            capture_output=True,
-            text=True,
-            check=False,
+            [sys.executable, str(MAIN), "--output", str(self.svg), *args],
+            capture_output=True, text=True, check=False,
         )
 
-    def test_cycle_and_isolated_package(self):
-        """Visit shared and cyclic nodes once in BFS order."""
-        result = self.run_cli(
-            "--package", "A", "--source", str(FIXTURE.with_name("cycle.json")),
-            "--test-mode", "--output", "graph.svg",
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.splitlines(), [
-            "A: B, C", "B: D", "C: D", "D: A",
-        ])
-
-    def test_acyclic_graph(self):
-        """Read the existing acyclic fixture and preserve all its edges."""
-        result = self.run_cli(
-            "--package", "A", "--source", str(FIXTURE),
-            "--test-mode", "--output", "graph.svg",
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.splitlines(), [
-            "A: B, C", "B: C", "C: (none)",
-        ])
-
-    def run_reverse(self, package, fixture):
-        """Find transitive dependents in an entire test repository."""
+    def run_test_graph(self, package, fixture, *options):
+        """Select a local repository and pass any extra flags."""
         return self.run_cli(
-            "--package", package, "--source", str(FIXTURE.with_name(fixture)),
-            "--test-mode", "--output", "graph.svg", "--reverse",
+            "--package", package, "--source", str(FIXTURES / fixture),
+            "--test-mode", *options,
         )
 
-    def test_reverse_diamond(self):
-        """Find incoming paths from all branches and print shared nodes once."""
-        result = self.run_reverse("D", "diamond.json")
+    @unittest.skipUnless(shutil.which("dot"), "requires Graphviz")
+    def test_svg_dot_and_cycle_tree(self):
+        """Render a real SVG and keep the cycle and both shared edges."""
+        result = self.run_test_graph("A", "cycle.json", "--ascii-tree")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "D <- B, C, A, E")
+        self.assertEqual(result.stdout.splitlines()[:6], [
+            "A", "+-- B", "|   `-- D", "|       `-- A [cycle]",
+            "`-- C", "    `-- D [shared]",
+        ])
+        dot = self.svg.with_suffix(".dot").read_text(encoding="utf-8")
+        self.assertIn('"B" -> "D";', dot)
+        self.assertIn('"C" -> "D";', dot)
+        self.assertIn('"D" -> "A";', dot)
+        self.assertNotIn('"E"', dot)
+        svg = ET.parse(self.svg).getroot()
+        self.assertEqual(svg.tag, "{http://www.w3.org/2000/svg}svg")
 
-    def test_reverse_cycle(self):
-        """Exclude the query package itself even when it is in a cycle."""
-        result = self.run_reverse("A", "cycle.json")
+    @unittest.skipUnless(shutil.which("dot"), "requires Graphviz")
+    def test_isolated_node_without_ascii_flag(self):
+        """Write a node-only SVG and keep the ASCII tree out of stdout."""
+        result = self.run_test_graph("F", "diamond.json")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "A <- D, B, C")
+        self.assertEqual(result.stdout.splitlines(), [
+            f"SVG: {self.svg}", f"DOT: {self.svg.with_suffix('.dot')}"
+        ])
+        dot = self.svg.with_suffix(".dot").read_text(encoding="utf-8")
+        self.assertIn('"F";', dot)
+        self.assertNotIn("->", dot)
 
-    def test_reverse_isolated_package(self):
-        """Report the empty reverse graph of an isolated package."""
-        result = self.run_reverse("F", "diamond.json")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "F <- (none)")
+    def test_reverse_graphs(self):
+        """Use the shared traversal on a diamond, cycle and isolated node."""
+        cases = (
+            ("D", "diamond.json", "D <- B, C, A, E"),
+            ("A", "cycle.json", "A <- D, B, C"),
+            ("F", "diamond.json", "F <- (none)"),
+        )
+        for package, filename, expected in cases:
+            with self.subTest(package=package):
+                result = self.run_test_graph(package, filename, "--reverse")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), expected)
+                self.assertFalse(self.svg.exists())
 
     def test_invalid_options(self):
-        """Report an invalid input for each option."""
-        valid = [
-            "--package", "serde", "--source", REGISTRY, "--output", "graph.svg",
-        ]
+        """Reject bad input for all settings and test-only reverse mode."""
+        valid = ["--package", "serde", "--source", REGISTRY]
         cases = {
             "--package": ["--package", "bad name"],
             "--source": ["--source", "invalid-url"],
             "--output": ["--output", "graph.png"],
             "--test-mode": ["--test-mode=maybe"],
             "--ascii-tree": ["--ascii-tree=maybe"],
+            "--reverse": ["--reverse"],
         }
         for option, override in cases.items():
             with self.subTest(option=option):
@@ -90,14 +99,28 @@ class CliTests(unittest.TestCase):
                 self.assertIn(option, result.stderr)
 
     def test_missing_test_file(self):
-        """Report a nonexistent file in test mode."""
-        missing = FIXTURE.with_name("missing.json")
-        result = self.run_cli(
-            "--package", "A", "--source", str(missing),
-            "--output", "graph.svg", "--test-mode",
-        )
+        """Reject a nonexistent file during configuration validation."""
+        result = self.run_test_graph("A", "missing.json")
         self.assertEqual(result.returncode, 2)
         self.assertIn("existing test repository file", result.stderr)
+
+    def test_unknown_start_node(self):
+        """Report a missing root without producing output files."""
+        result = self.run_test_graph("Z", "cycle.json")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("unknown test package: Z", result.stderr)
+        self.assertFalse(self.svg.exists())
+
+    def test_bad_test_repository(self):
+        """Report invalid package references in a local JSON graph."""
+        self.svg.parent.mkdir()
+        source = self.svg.parent / "bad.json"
+        source.write_text('{"A": ["bb"]}', encoding="utf-8")
+        result = self.run_cli(
+            "--package", "A", "--source", str(source), "--test-mode",
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("must be letters A-Z", result.stderr)
 
 
 if __name__ == "__main__":

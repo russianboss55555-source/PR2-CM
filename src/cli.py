@@ -53,9 +53,9 @@ def validate_config(
 
 
 def parse_config() -> argparse.Namespace:
-    """Read all five configuration options from the command line."""
+    """Read user settings and select an optional reverse query."""
     parser = argparse.ArgumentParser(
-        description="Build the Cargo dependency graph."
+        description="Build and visualize a Cargo dependency graph."
     )
     parser.add_argument("--package", required=True, help="crate name")
     parser.add_argument("--source", required=True, help="registry URL or file")

@@ -90,16 +90,3 @@ class CargoIndex:
             raise ValueError(f"crate {package!r} has no non-yanked releases")
         stable = [release for release in releases if release.order.stable]
         return max(stable or releases, key=lambda release: release.order)
-
-
-def describe_dependency(dependency: dict[str, Any]) -> str:
-    """Describe a direct dependency with its requirement and attributes."""
-    name = dependency["name"]
-    canonical = dependency.get("package") or name
-    alias = f" as {name}" if canonical != name else ""
-    kind = dependency.get("kind") or "normal"
-    optional = ", optional" if dependency.get("optional") else ""
-    target = dependency.get("target")
-    condition = f", {target}" if target else ""
-    modifiers = f"{kind}{optional}{condition}"
-    return f"{canonical}{alias} {dependency['req']} [{modifiers}]"
