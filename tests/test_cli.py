@@ -46,6 +46,31 @@ class CliTests(unittest.TestCase):
             "A: B, C", "B: C", "C: (none)",
         ])
 
+    def run_reverse(self, package, fixture):
+        """Find transitive dependents in an entire test repository."""
+        return self.run_cli(
+            "--package", package, "--source", str(FIXTURE.with_name(fixture)),
+            "--test-mode", "--output", "graph.svg", "--reverse",
+        )
+
+    def test_reverse_diamond(self):
+        """Find incoming paths from all branches and print shared nodes once."""
+        result = self.run_reverse("D", "diamond.json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "D <- B, C, A, E")
+
+    def test_reverse_cycle(self):
+        """Exclude the query package itself even when it is in a cycle."""
+        result = self.run_reverse("A", "cycle.json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "A <- D, B, C")
+
+    def test_reverse_isolated_package(self):
+        """Report the empty reverse graph of an isolated package."""
+        result = self.run_reverse("F", "diamond.json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "F <- (none)")
+
     def test_invalid_options(self):
         """Report an invalid input for each option."""
         valid = [

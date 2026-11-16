@@ -5,7 +5,7 @@ from argparse import Namespace
 
 from cargo_graph import CargoGraph
 from cli import parse_config
-from graph import Graph, recursive_bfs
+from graph import Graph, recursive_bfs, reverse_graph
 from local_index import read_test_index
 from registry import CargoIndex
 
@@ -16,6 +16,8 @@ def build_graph(config: Namespace) -> tuple[str, Graph]:
         repository = read_test_index(config.source)
         if config.package not in repository:
             raise ValueError(f"unknown test package: {config.package}")
+        if config.reverse:
+            repository = reverse_graph(repository)
         graph = recursive_bfs(config.package, repository.__getitem__)
         return config.package, graph
     index = CargoIndex(config.source)
@@ -27,10 +29,14 @@ def main() -> int:
     """Print the graph in BFS order, including original cycle edges."""
     config = parse_config()
     try:
-        _, graph = build_graph(config)
+        root, graph = build_graph(config)
     except (KeyError, OSError, RecursionError, TypeError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
+    if config.reverse:
+        dependents = [package for package in graph if package != root]
+        print(f"{root} <- {', '.join(dependents) or '(none)'}")
+        return 0
     for package, dependencies in graph.items():
         print(f"{package}: {', '.join(dependencies) or '(none)'}")
     return 0

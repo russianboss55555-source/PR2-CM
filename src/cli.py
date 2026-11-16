@@ -45,6 +45,8 @@ def validate_config(
     elif not is_repository_url(config.source):
         parser.error("--source: expected an HTTP or HTTPS registry URL")
 
+    if config.reverse and not config.test_mode:
+        parser.error("--reverse requires --test-mode")
     output = Path(config.output)
     if output.suffix.lower() != ".svg" or output.is_dir():
         parser.error("--output: expected an SVG filename with .svg suffix")
@@ -69,6 +71,10 @@ def parse_config() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=False,
         help="enable ASCII tree output",
+    )
+    parser.add_argument(
+        "--reverse", action="store_true",
+        help="find packages depending on the selected local test package",
     )
     config = parser.parse_args()
     validate_config(parser, config)

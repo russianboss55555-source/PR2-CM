@@ -29,3 +29,15 @@ def recursive_bfs(
 
     visit_layer([root])
     return graph
+
+
+def reverse_graph(graph: Graph) -> Graph:
+    """Reverse every edge and keep vertices with no incoming edges."""
+    incoming: dict[str, list[str]] = {package: [] for package in graph}
+    for package, dependencies in graph.items():
+        for dependency in dependencies:
+            incoming[dependency].append(package)
+    return {
+        package: tuple(sorted(dependents))
+        for package, dependents in incoming.items()
+    }
