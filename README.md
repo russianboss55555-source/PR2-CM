@@ -12,19 +12,22 @@
 Отдельная сборка и установка пакетов через pip не требуются.
 Cargo нужен для контрольного сравнения в конце работы.
 
-Команды для PowerShell выполняются из корня репозитория.
+Команды для PowerShell выполняются из корня репозитория. Справку можно
+открыть командой `.\run.bat --help`. На Linux и macOS используйте
+`python3 src/main.py` с теми же параметрами.
+
+## Этап 5. Демонстрация пакета itertools
+
+Для демонстрации визуализации используйте пакет Cargo `itertools`.
+Имя пакета в аргументе `--package` пишется строчными буквами.
 
 ```powershell
-.\run.bat --help
-.\run.bat --package A --source tests/fixtures/cycle.json --test-mode --output out/cycle.svg --ascii-tree
-.\run.bat --package D --source tests/fixtures/diamond.json --test-mode --output out/reverse.svg --reverse
 .\run.bat --package itertools --source https://index.crates.io --output out/itertools.svg --ascii-tree
-python -m unittest discover -s tests -v
+Invoke-Item .\out\itertools.svg
 ```
 
-На Linux и macOS замените `.\run.bat` на `python3 src/main.py`, а команду
-тестов запустите через `python3`. Готовое изображение можно открыть в браузере.
-Файл `.dot` сохраняется рядом с `.svg`.
+В консоли появится дерево `itertools → either`. Изображение `out/itertools.svg`
+можно открыть в браузере. Файл `out/itertools.dot` содержит описание графа.
 
 ## Параметры
 
@@ -53,9 +56,9 @@ python -m unittest discover -s tests -v
 | 4 | Разворот всех рёбер тестового репозитория и повторный запуск BFS. |
 | 5 | Сохранение DOT и SVG, ASCII-дерево по флагу и сравнение с Cargo. |
 
-Историю этапов можно показать командой `git log -5 --oneline`. Выводы этапов 1–4
-сохранены в соответствующих коммитах. Итоговый запуск формирует файлы
-и печатает пути к ним. Для этапа 4 в итоговой версии доступен `--reverse`.
+Пять основных коммитов этапов можно показать командой
+`git log -5 --oneline e1cb06d`. Для этапа 4 в итоговой версии доступен
+`--reverse`.
 
 ### Прямые и транзитивные зависимости
 
@@ -73,6 +76,16 @@ python -m unittest discover -s tests -v
 ```json
 {"A": ["B", "C"], "B": ["D"], "C": ["D"], "D": ["A"], "E": []}
 ```
+
+Команды для локального тестового графа и запуска автотестов в PowerShell.
+
+```powershell
+.\run.bat --package A --source tests/fixtures/cycle.json --test-mode --output out/cycle.svg --ascii-tree
+.\run.bat --package D --source tests/fixtures/diamond.json --test-mode --output out/reverse.svg --reverse
+python -m unittest discover -s tests -v
+```
+
+На Linux и macOS для запуска автотестов используйте `python3`.
 
 На этом графе BFS посещает вершины в порядке `A, B, C, D`. Ребро `D → A`
 сохраняется, хотя `A` уже посещён. ASCII-дерево помечает обратное ребро как
@@ -100,7 +113,7 @@ cargo --version
 python demo/compare_cargo.py
 ```
 
-Скрипт вызывает визуализатор для `either`, `itertools` и `aho-corasick`,
+Скрипт вызывает визуализатор для `itertools`, `either` и `aho-corasick`,
 сохраняет их DOT и SVG в `out/` и печатает дерево для каждого. Затем он создаёт
 временный Rust-проект с одним пакетом той же версии и запускает
 `cargo tree --prefix depth --no-dedupe --edges normal,build --target all`.

@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = "https://index.crates.io"
-PACKAGES = ("either", "itertools", "aho-corasick")
+PACKAGES = ("itertools", "either", "aho-corasick")
 DOT_NODE = re.compile(r'  "([^"]+)";')
 DOT_EDGE = re.compile(r'  "([^"]+)" -> "([^"]+)";')
 CARGO_ROW = re.compile(r"(\d+)\s*\|([^ ]+ v[^ ]+)$")
