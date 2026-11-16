@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as element_tree
 from pathlib import Path
 
 
@@ -52,7 +52,7 @@ class CliTests(unittest.TestCase):
         self.assertIn('"C" -> "D";', dot)
         self.assertIn('"D" -> "A";', dot)
         self.assertNotIn('"E"', dot)
-        svg = ET.parse(self.svg).getroot()
+        svg = element_tree.parse(self.svg).getroot()
         self.assertEqual(svg.tag, "{http://www.w3.org/2000/svg}svg")
 
     @unittest.skipUnless(shutil.which("dot"), "requires Graphviz")
