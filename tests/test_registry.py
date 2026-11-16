@@ -51,21 +51,33 @@ class RegistryTests(unittest.TestCase):
             capture_output=True, text=True, check=False,
         )
 
-    def test_direct_dependencies(self):
-        """Use SemVer and keep renamed, optional, and target declarations."""
-        older = dict(name="demo", vers="1.9.0", deps=[])
-        yanked = dict(name="demo", vers="2.0.0", deps=[], yanked=True)
-        dependency = dict(
-            name="alias", package="ab", req="^2", kind="build",
-            target="cfg(unix)", optional=True,
+    def populate_demo(self):
+        """Create an index with ranges, a renamed crate and optional crates."""
+        required = dict(name="alias", package="ab", req="^1.5", kind="build")
+        optional = dict(name="xyz", req="^1", optional=True)
+        release = dict(
+            name="demo", vers="1.10.0", deps=[required, optional],
+            features={"default": ["extra"], "extra": ["dep:xyz"]},
         )
-        latest = dict(name="demo", vers="1.10.0", deps=[dependency])
-        self.write_index("de/mo/demo", latest, older, yanked)
+        self.write_index(
+            "de/mo/demo", release, dict(name="demo", vers="1.9.0", deps=[]),
+            dict(name="demo", vers="2.0.0", deps=[], yanked=True),
+        )
+        self.write_index(
+            "2/ab", *(dict(name="ab", vers=v, deps=[])
+                      for v in ("1.4.0", "1.10.0", "2.0.0")),
+        )
+        self.write_index("3/x/xyz", dict(name="xyz", vers="1.0.0", deps=[]))
+
+    def test_registry_graph(self):
+        """Resolve a version range and follow an optional default feature."""
+        self.populate_demo()
         result = self.run_cli("Demo")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.splitlines(), [
-            "demo v1.10.0",
-            "ab as alias ^2 [build, optional, cfg(unix)]",
+            "demo v1.10.0: ab v1.10.0, xyz v1.0.0",
+            "ab v1.10.0: (none)",
+            "xyz v1.0.0: (none)",
         ])
 
     def test_missing_crate(self):

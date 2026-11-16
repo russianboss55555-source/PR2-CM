@@ -1,26 +1,38 @@
-"""Print the direct dependency declarations for stage 2."""
+"""Build and inspect a transitive Cargo dependency graph."""
 
 import sys
+from argparse import Namespace
 
+from cargo_graph import CargoGraph
 from cli import parse_config
-from registry import CargoIndex, describe_dependency
+from graph import Graph, recursive_bfs
+from local_index import read_test_index
+from registry import CargoIndex
+
+
+def build_graph(config: Namespace) -> tuple[str, Graph]:
+    """Read the selected source and build the reachable graph from the root."""
+    if config.test_mode:
+        repository = read_test_index(config.source)
+        if config.package not in repository:
+            raise ValueError(f"unknown test package: {config.package}")
+        graph = recursive_bfs(config.package, repository.__getitem__)
+        return config.package, graph
+    index = CargoIndex(config.source)
+    cargo = CargoGraph(index, index.latest(config.package))
+    return cargo.root, cargo.build()
 
 
 def main() -> int:
-    """Read the selected release and print its direct dependencies."""
+    """Print the graph in BFS order, including original cycle edges."""
     config = parse_config()
-    if config.test_mode:
-        print("error: the local graph is supported starting at stage 3",
-              file=sys.stderr)
-        return 1
     try:
-        release = CargoIndex(config.source).latest(config.package)
-        lines = [describe_dependency(item) for item in release.entry["deps"]]
-    except (KeyError, ValueError) as error:
+        _, graph = build_graph(config)
+    except (KeyError, OSError, RecursionError, TypeError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    print(f"{release.name} v{release.version}")
-    print("\n".join(lines) or "(no direct dependencies)")
+    for package, dependencies in graph.items():
+        print(f"{package}: {', '.join(dependencies) or '(none)'}")
     return 0
 
 

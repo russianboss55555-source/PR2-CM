@@ -24,6 +24,28 @@ class CliTests(unittest.TestCase):
             check=False,
         )
 
+    def test_cycle_and_isolated_package(self):
+        """Visit shared and cyclic nodes once in BFS order."""
+        result = self.run_cli(
+            "--package", "A", "--source", str(FIXTURE.with_name("cycle.json")),
+            "--test-mode", "--output", "graph.svg",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            "A: B, C", "B: D", "C: D", "D: A",
+        ])
+
+    def test_acyclic_graph(self):
+        """Read the existing acyclic fixture and preserve all its edges."""
+        result = self.run_cli(
+            "--package", "A", "--source", str(FIXTURE),
+            "--test-mode", "--output", "graph.svg",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            "A: B, C", "B: C", "C: (none)",
+        ])
+
     def test_invalid_options(self):
         """Report an invalid input for each option."""
         valid = [
