@@ -16,18 +16,23 @@ Cargo нужен для контрольного сравнения в конц�
 открыть командой `.\run.bat --help`. На Linux и macOS используйте
 `python3 src/main.py` с теми же параметрами.
 
-## Этап 5. Демонстрация пакета itertools
+## Этап 5. Демонстрация пакета image
 
-Для демонстрации визуализации используйте пакет Cargo `itertools`.
+Для демонстрации визуализации используйте пакет Cargo `image`.
 Имя пакета в аргументе `--package` пишется строчными буквами.
 
 ```powershell
-.\run.bat --package itertools --source https://index.crates.io --output out/itertools.svg --ascii-tree
-Invoke-Item .\out\itertools.svg
+python demo/stage5.py
+Invoke-Item .\out\image.svg
 ```
 
-В консоли появится дерево `itertools → either`. Изображение `out/itertools.svg`
-можно открыть в браузере. Файл `out/itertools.dot` содержит описание графа.
+В консоли появится разветвлённое дерево зависимостей `image`.
+Изображение `out/image.svg` можно открыть в браузере. Файл `out/image.dot`
+содержит описание графа. Для запуска через PyCharm откройте
+`demo/stage5.py` и выберите Run. В Windows также можно открыть `START_5.bat`.
+Пакет `image` работает с изображениями и использует библиотеки форматов,
+сжатия и параллельной обработки. Версии и число вершин зависят от реестра.
+Другой пакет можно выбрать через `python demo/stage5.py --package regex`.
 
 ## Параметры
 

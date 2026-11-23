@@ -17,3 +17,18 @@ jobs:
         run: python3 demo/compare_cargo.py
       - name: Read crates.io reverse dependencies API
         run: python3 demo/reverse_real.py
+      - name: Visualize a larger real package
+        run: |
+          python3 demo/stage5.py
+          python3 - <<'PY'
+          import re
+          import xml.etree.ElementTree as element_tree
+          from pathlib import Path
+          dot = Path("out/image.dot").read_text()
+          nodes = re.findall(r'^  "([^"]+)";$', dot, re.MULTILINE)
+          edges = re.findall(r'^  "([^"]+)" -> "([^"]+)";$', dot, re.MULTILINE)
+          assert len(nodes) >= 10, len(nodes)
+          assert len(edges) >= 10, len(edges)
+          element_tree.parse("out/image.svg")
+          print(f"image graph: {len(nodes)} vertices, {len(edges)} edges")
+          PY
