@@ -1,6 +1,7 @@
-"""Find reverse dependencies inside a real Cargo package's graph."""
+"""Query crates.io reverse_dependencies directly for a real Rust crate."""
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -8,52 +9,55 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from cargo_graph import CargoGraph
-from cli import is_repository_url
-from graph import Graph, recursive_bfs, reverse_graph
-from registry import CargoIndex
+from cli import CRATE_NAME, is_repository_url
+from reverse_api import ReverseApi
 
 
-def find_dependents(graph: Graph, package: str) -> dict[str, list[str]]:
-    """Find transitive incoming paths to every version of a crate."""
-    reversed_graph = reverse_graph(graph)
-    prefix = f"{package.lower()} v"
-    targets = [node for node in graph if node.lower().startswith(prefix)]
-    if not targets:
-        raise ValueError(f"{package!r} is absent from the selected graph")
-    results = {}
-    for target in targets:
-        reached = recursive_bfs(target, reversed_graph.__getitem__)
-        results[target] = [node for node in reached if node != target]
-    return results
+DEFAULT_PACKAGE = "itertools-num"
+DEFAULT_API = "https://crates.io/api/v1"
+
+
+def positive_depth(value: str) -> int:
+    """Require at least one level of reverse dependencies."""
+    depth = int(value)
+    if depth <= 0:
+        raise argparse.ArgumentTypeError("depth must be positive")
+    return depth
 
 
 def parse_options() -> argparse.Namespace:
-    """Read the graph root, reverse query and sparse index URL."""
+    """Read the target crate, API URL and requested traversal depth."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--package", default="itertools")
-    parser.add_argument("--reverse-of", default="either")
-    parser.add_argument("--source", default="https://index.crates.io")
+    parser.add_argument("--package", default=DEFAULT_PACKAGE)
+    parser.add_argument("--source", default=DEFAULT_API, help="API base URL")
+    parser.add_argument("--depth", type=positive_depth, default=1)
     config = parser.parse_args()
+    if re.fullmatch(CRATE_NAME, config.package) is None:
+        parser.error("--package: expected a Cargo crate name")
     if not is_repository_url(config.source):
-        parser.error("--source: expected an HTTP or HTTPS index URL")
+        parser.error("--source: expected an HTTP(S) API base URL")
+    config.package = config.package.lower()
     return config
 
 
 def main() -> int:
-    """Download a real graph and query it using the shared recursive BFS."""
+    """Fetch reverse dependencies from the registry API and print them."""
     config = parse_options()
+    api = ReverseApi(config.source, config.depth)
+    print(f"API: {api.page_url(config.package, 1)}", flush=True)
+    print(f"Package: {config.package}", flush=True)
+    print(f"Reverse depth: {config.depth} (all result pages)", flush=True)
     try:
-        index = CargoIndex(config.source)
-        cargo = CargoGraph(index, index.latest(config.package))
-        results = find_dependents(cargo.build(), config.reverse_of)
+        graph = api.build(config.package)
     except (KeyError, OSError, RecursionError, TypeError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    print(f"Repository: {config.source}")
-    print(f"Scope: dependency graph of {cargo.root}")
-    for target, dependents in results.items():
-        print(f"{target} <- {', '.join(dependents) or '(none)'}")
+    dependents = [node for node in graph if node != config.package]
+    print(f"Found: {len(dependents)} reverse dependents")
+    for package in dependents:
+        print(f"{config.package} <- {package} v{api.versions[package]}")
+    if not dependents:
+        print(f"{config.package} <- (none)")
     return 0
 
 

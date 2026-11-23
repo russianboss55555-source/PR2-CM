@@ -15,5 +15,5 @@ jobs:
         run: python3 -m unittest discover -s tests -v
       - name: Compare real packages with Cargo
         run: python3 demo/compare_cargo.py
-      - name: Find reverse dependencies in a real graph
+      - name: Read crates.io reverse dependencies API
         run: python3 demo/reverse_real.py
